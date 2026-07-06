@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Todo App</title>
+
+    <style>
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+            font-family:Arial, Helvetica, sans-serif;
+        }
+
+        body{
+            background:#f5f5f5;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            min-height:100vh;
+        }
+
+        .container{
+            width:420px;
+            background:white;
+            padding:25px;
+            border-radius:12px;
+            box-shadow:0 8px 20px rgba(0,0,0,.15);
+        }
+
+        h1{
+            text-align:center;
+            margin-bottom:20px;
+            color:#333;
+        }
+
+        .input-group{
+            display:flex;
+            gap:10px;
+        }
+
+        input{
+            flex:1;
+            padding:10px;
+            border:1px solid #ccc;
+            border-radius:8px;
+            outline:none;
+            font-size:16px;
+        }
+
+        button{
+            padding:10px 16px;
+            border:none;
+            border-radius:8px;
+            background:#2563eb;
+            color:white;
+            cursor:pointer;
+            transition:.2s;
+        }
+
+        button:hover{
+            background:#1d4ed8;
+        }
+
+        ul{
+            list-style:none;
+            margin-top:20px;
+        }
+
+        li{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            background:#f8f8f8;
+            padding:12px;
+            margin-bottom:10px;
+            border-radius:8px;
+        }
+
+        li.completed span{
+            text-decoration:line-through;
+            color:gray;
+        }
+
+        .actions{
+            display:flex;
+            gap:8px;
+        }
+
+        .complete-btn{
+            background:#16a34a;
+        }
+
+        .complete-btn:hover{
+            background:#15803d;
+        }
+
+        .delete-btn{
+            background:#dc2626;
+        }
+
+        .delete-btn:hover{
+            background:#b91c1c;
+        }
+
+        .error{
+            color:#dc2626;
+            font-size:14px;
+            margin-top:10px;
+            text-align:center;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>📝 Todo App</h1>
+
+    <div class="input-group">
+        <input
+            type="text"
+            id="taskInput"
+            placeholder="Enter a task..."
+        >
+
+        <button onclick="addTask()">Add</button>
+    </div>
+
+    <p id="errorMsg" class="error"></p>
+
+    <ul id="taskList"></ul>
+
+</div>
+
+<script src="env.js"></script>
+<script>
+
+const taskInput = document.getElementById("taskInput");
+const taskList = document.getElementById("taskList");
+const errorMsg = document.getElementById("errorMsg");
+
+const API_URL = window.API_URL || "http://localhost:3000";
+
+function showError(msg){
+    errorMsg.textContent = msg;
+    setTimeout(() => { errorMsg.textContent = ""; }, 3000);
+}
+
+function renderTodo(todo){
+
+    const li = document.createElement("li");
+    li.dataset.id = todo.id;
+
+    if(todo.completed){
+        li.classList.add("completed");
+    }
+
+    li.innerHTML = `
+        <span>${todo.text}</span>
+
+        <div class="actions">
+            <button class="complete-btn">✓</button>
+            <button class="delete-btn">✕</button>
+        </div>
+    `;
+
+    li.querySelector(".complete-btn").onclick = function(){
+        toggleTask(todo.id, li);
+    };
+
+    li.querySelector(".delete-btn").onclick = function(){
+        deleteTask(todo.id, li);
+    };
+
+    taskList.appendChild(li);
+}
+
+async function loadTasks(){
+
+    try{
+        const res = await fetch(`${API_URL}/todos`);
+
+        if(!res.ok){
+            throw new Error("Failed to load tasks");
+        }
+
+        const todos = await res.json();
+
+        taskList.innerHTML = "";
+        todos.forEach(renderTodo);
+
+    }catch(err){
+        showError("Could not reach server. Is the backend running?");
+    }
+}
+
+async function addTask(){
+
+    const text = taskInput.value.trim();
+
+    if(text === ""){
+        alert("Please enter a task.");
+        return;
+    }
+
+    try{
+        const res = await fetch(`${API_URL}/todos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text })
+        });
+
+        if(!res.ok){
+            throw new Error("Failed to add task");
+        }
+
+        const todo = await res.json();
+
+        renderTodo(todo);
+
+        taskInput.value = "";
+        taskInput.focus();
+
+    }catch(err){
+        showError("Could not add task. Is the backend running?");
+    }
+}
+
+async function toggleTask(id, li){
+
+    try{
+        const res = await fetch(`${API_URL}/todos/${id}`, {
+            method: "PUT"
+        });
+
+        if(!res.ok){
+            throw new Error("Failed to update task");
+        }
+
+        li.classList.toggle("completed");
+
+    }catch(err){
+        showError("Could not update task.");
+    }
+}
+
+async function deleteTask(id, li){
+
+    try{
+        const res = await fetch(`${API_URL}/todos/${id}`, {
+            method: "DELETE"
+        });
+
+        if(!res.ok && res.status !== 204){
+            throw new Error("Failed to delete task");
+        }
+
+        li.remove();
+
+    }catch(err){
+        showError("Could not delete task.");
+    }
+}
+
+taskInput.addEventListener("keypress", function(e){
+
+    if(e.key === "Enter"){
+        addTask();
+    }
+
+});
+
+loadTasks();
+
+</script>
+
+</body>
+</html>
